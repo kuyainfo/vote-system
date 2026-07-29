@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>冠軍預測 - 投影畫面</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{
+  --bg:#080d1c; --card:rgba(255,255,255,.045); --line:rgba(255,255,255,.10);
+  --gold:#f5c451; --txt:#f2f5ff; --sub:#8e9ac0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;}
+body{background:
+  radial-gradient(90% 70% at 12% -10%,rgba(245,196,81,.16),transparent 60%),
+  radial-gradient(80% 70% at 92% 110%,rgba(80,120,255,.16),transparent 60%),
+  var(--bg);}
+header{height:13vh;display:flex;align-items:center;justify-content:space-between;
+  padding:0 3.2vw;border-bottom:1px solid var(--line)}
+.brand .kick{font-size:1.05vh;letter-spacing:.7em;color:var(--gold);margin-bottom:.9vh}
+.brand h1{font-size:4.4vh;letter-spacing:.1em;font-weight:800}
+.stats{display:flex;gap:2.6vw;align-items:center}
+.stat{text-align:right}
+.stat .n{font-size:4.2vh;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.stat .l{font-size:1.25vh;letter-spacing:.34em;color:var(--sub);margin-top:.8vh}
+.live{display:flex;align-items:center;gap:.6vw;font-size:1.3vh;letter-spacing:.24em;color:var(--sub)}
+.led{width:1vh;height:1vh;border-radius:50%;background:#3ad07a;box-shadow:0 0 1.4vh #3ad07a;
+  animation:pulse 1.6s infinite}
+.led.off{background:#e0555f;box-shadow:0 0 1.4vh #e0555f;animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+#list{height:87vh;padding:1.4vh 3.2vw;display:flex;flex-direction:column}
+.row{display:flex;align-items:center;
+  background:var(--card);border:1px solid var(--line);border-radius:1.4vh;
+  padding:0 1.8vw 0 1.4vw;overflow:hidden;transition:border-color .4s,background .4s}
+.row .rank{width:3.6vw;font-size:3.1vh;font-weight:800;color:var(--sub);text-align:center;
+  font-variant-numeric:tabular-nums}
+.chip{border-radius:50%;flex:none;border:.3vh solid rgba(255,255,255,.14)}
+.row .info{width:12vw;padding-left:1.3vw;flex:none}
+.row .nm{font-size:3vh;font-weight:700;letter-spacing:.08em;white-space:nowrap}
+.track{flex:1;height:2.2vh;background:rgba(255,255,255,.06);border-radius:1.1vh;overflow:hidden}
+.fill{height:100%;width:0;border-radius:1.1vh;transition:width .7s cubic-bezier(.22,1,.28,1)}
+.num{width:10vw;text-align:right;flex:none}
+.num .v{font-size:3.4vh;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.num .p{font-size:1.4vh;color:var(--sub);margin-top:.5vh;font-variant-numeric:tabular-nums}
+
+.row.top{border-color:var(--gold);background:linear-gradient(90deg,rgba(245,196,81,.14),rgba(255,255,255,.04))}
+.row.top .rank,.row.top .num .v{color:var(--gold)}
+.row.bump{animation:bump .5s}
+@keyframes bump{0%{box-shadow:0 0 0 0 rgba(245,196,81,.55)}100%{box-shadow:0 0 0 1.4vh rgba(245,196,81,0)}}
+
+.tag{position:absolute;left:3.2vw;bottom:1.2vh;font-size:1.1vh;color:#4d5678;letter-spacing:.16em}
+.simbtn{position:absolute;right:3.2vw;bottom:1.4vh;background:#1b2340;color:#8e9ac0;border:1px solid var(--line);
+  border-radius:.8vh;padding:.8vh 1.2vw;font-size:1.3vh;font-family:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="kick">AUDIENCE PREDICTION</div>
+    <h1 id="ttl">誰會是冠軍？</h1>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="n" id="nVoters">0</div><div class="l">投票人數</div></div>
+    <div class="stat"><div class="n" id="nVotes">0</div><div class="l">總票數</div></div>
+    <div class="live"><span class="led" id="led"></span><span id="liveTxt">即時更新中</span></div>
+  </div>
+</header>
+
+<div id="list"></div>
+<div class="tag" id="modeTag"></div>
+<button class="simbtn" id="sim" style="display:none">＋ 模擬 20 票</button>
+
+<script>
+/* ===================== 設定區（需與投票端一致） ===================== */
+const FB_CONFIG = {
+  apiKey:            "AIzaSyDl_NqANwk_lsfEL5kOyC1RJi29DLvGPU8",
+  authDomain:        "kuya-candy-game.firebaseapp.com",
+  databaseURL:       "https://kuya-candy-game-default-rtdb.firebaseio.com",
+  projectId:         "kuya-candy-game",
+  storageBucket:     "kuya-candy-game.firebasestorage.app",
+  messagingSenderId: "105923267148",
+  appId:             "1:105923267148:web:1f0e0db9de8cc2876c42e9"
+};
+const DB_ROOT = "predict";
+const COLORS  = ["#e5484d","#e5793a","#f5c451","#8fbf3f","#3fbf86",
+                 "#3fb5bf","#4a8ff0","#6f6ff0","#a45ff0","#e05fae"];
+const CANDIDATES = [
+  {no:1,name:"第一隊"},{no:2,name:"第二隊"},{no:3,name:"第三隊"},
+  {no:4,name:"第四隊"},{no:5,name:"第五隊"},{no:6,name:"第六隊"},
+  {no:7,name:"第七隊"},{no:8,name:"第八隊"},{no:9,name:"第九隊"},
+  {no:10,name:"第十隊"}
+];
+/* ================================================================== */
+
+CANDIDATES.forEach((c,i)=>{ c.color = c.color || COLORS[i % COLORS.length]; });
+
+const DEMO = !FB_CONFIG.apiKey || FB_CONFIG.apiKey.indexOf("PASTE")===0;
+const LS_VOTES="predict_local_votes";
+let db=null,bc=null;
+
+const list=document.getElementById("list");
+const rows={}; let lastVal={};
+
+CANDIDATES.forEach(c=>{
+  const d=document.createElement("div");
+  d.className="row";
+  d.innerHTML='<div class="rank">-</div>'+
+    '<span class="chip" style="background:'+c.color+'"></span>'+
+    '<div class="info"><div class="nm">'+c.name+'</div></div>'+
+    '<div class="track"><div class="fill" style="background:'+c.color+'"></div></div>'+
+    '<div class="num"><div class="v">0</div><div class="p">0.0%</div></div>';
+  list.appendChild(d); rows[c.no]=d;
+});
+
+function layout(){
+  const H=list.clientHeight, n=CANDIDATES.length;
+  const gap=H*0.012, rh=(H-gap*(n-1))/n;
+  CANDIDATES.forEach((c,i)=>{
+    const el=rows[c.no];
+    el.style.height=rh+"px";
+    el.style.marginBottom = (i<n-1? gap+"px" : "0");
+    const chip=el.querySelector(".chip");
+    chip.style.width=(rh*0.62)+"px"; chip.style.height=(rh*0.62)+"px";
+  });
+  paint(window.__counts||{});
+}
+window.addEventListener("resize",layout);
+
+function paint(counts){
+  const arr=CANDIDATES.map(c=>({no:c.no,v:counts[c.no]||0}));
+  const total=arr.reduce((s,x)=>s+x.v,0);
+  const max=Math.max.apply(null,arr.map(x=>x.v));
+  const sorted=arr.slice().sort((a,b)=> b.v-a.v || a.no-b.no );
+  const rankOf={}; sorted.forEach((x,i)=>rankOf[x.no]=i+1);
+
+  arr.forEach(x=>{
+    const el=rows[x.no];
+    el.classList.toggle("top", total>0 && rankOf[x.no]===1);
+    el.querySelector(".rank").textContent = total>0 ? rankOf[x.no] : "-";
+    el.querySelector(".fill").style.width = (max>0 ? (x.v/max*100) : 0)+"%";
+    el.querySelector(".v").textContent=x.v;
+    el.querySelector(".p").textContent = (total>0 ? (x.v/total*100).toFixed(1) : "0.0")+"%";
+    if(lastVal[x.no]!==undefined && x.v>lastVal[x.no]){
+      el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
+    }
+    lastVal[x.no]=x.v;
+  });
+  document.getElementById("nVotes").textContent=total;
+}
+
+function tally(votes){
+  const counts={}; let voters=0;
+  Object.keys(votes||{}).forEach(k=>{
+    const p=votes[k]&&votes[k].picks; if(!Array.isArray(p))return;
+    voters++; p.forEach(no=>{ counts[no]=(counts[no]||0)+1; });
+  });
+  window.__counts=counts;
+  document.getElementById("nVoters").textContent=voters;
+  paint(counts);
+}
+
+layout();
+
+if(DEMO){
+  document.getElementById("modeTag").textContent="DEMO 模式（未接 Firebase，讀本機資料）";
+  document.getElementById("sim").style.display="block";
+  const read=()=>tally(JSON.parse(localStorage.getItem(LS_VOTES)||"{}"));
+  read();
+  try{ bc=new BroadcastChannel(DB_ROOT); bc.onmessage=read; }catch(e){}
+  window.addEventListener("storage",read);
+  setInterval(read,1000);
+  document.getElementById("sim").onclick=()=>{
+    const all=JSON.parse(localStorage.getItem(LS_VOTES)||"{}");
+    for(let i=0;i<20;i++){
+      const pool=CANDIDATES.map(c=>c.no).sort(()=>Math.random()-0.5);
+      all["sim"+Date.now()+"_"+i]={picks:pool.slice(0,3),updatedAt:Date.now()};
+    }
+    localStorage.setItem(LS_VOTES,JSON.stringify(all)); read();
+  };
+}else{
+  firebase.initializeApp(FB_CONFIG); db=firebase.database();
+  db.ref(DB_ROOT+"/votes").on("value",s=>tally(s.val()||{}));
+  db.ref(".info/connected").on("value",s=>{
+    const on=!!s.val();
+    document.getElementById("led").classList.toggle("off",!on);
+    document.getElementById("liveTxt").textContent = on ? "即時更新中" : "連線中斷";
+  });
+}
+</script>
+</body>
+</html>

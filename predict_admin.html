@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>冠軍預測 - 控制台</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0b1020;color:#eef1fa;font-family:"PingFang TC","Noto Sans TC",sans-serif;padding:24px}
+.wrap{max-width:720px;margin:0 auto}
+h1{font-size:20px;letter-spacing:.08em;margin-bottom:4px}
+.sub{font-size:12px;color:#8e9ac0;letter-spacing:.1em;margin-bottom:22px}
+.cards{display:flex;gap:12px;margin-bottom:20px}
+.c{flex:1;background:#151c33;border:1px solid #2c3557;border-radius:12px;padding:14px 16px}
+.c .n{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+.c .l{font-size:11px;color:#8e9ac0;letter-spacing:.24em;margin-top:6px}
+table{width:100%;border-collapse:collapse;background:#151c33;border:1px solid #2c3557;border-radius:12px;overflow:hidden}
+th,td{padding:10px 14px;font-size:14px;text-align:left;border-bottom:1px solid #232b48}
+th{font-size:11px;letter-spacing:.2em;color:#8e9ac0;font-weight:600}
+td.r{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:none}
+.acts{display:flex;gap:10px;margin-top:20px}
+button{padding:11px 18px;border-radius:9px;border:1px solid #2c3557;background:#1b2340;color:#eef1fa;
+  font-family:inherit;font-size:14px;cursor:pointer}
+button.danger{background:#3a1d24;border-color:#77303f;color:#ffc9d2}
+.tag{font-size:11px;color:#4d5678;letter-spacing:.14em;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>冠軍預測 ・ 控制台</h1>
+  <div class="sub" id="modeTag">—</div>
+
+  <div class="cards">
+    <div class="c"><div class="n" id="nVoters">0</div><div class="l">投票人數</div></div>
+    <div class="c"><div class="n" id="nVotes">0</div><div class="l">總票數</div></div>
+    <div class="c"><div class="n" id="lead">—</div><div class="l">目前領先</div></div>
+  </div>
+
+  <table>
+    <thead><tr><th>名次</th><th>編號</th><th>參賽者</th><th class="r">票數</th><th class="r">得票率</th></tr></thead>
+    <tbody id="tb"></tbody>
+  </table>
+
+  <div class="acts">
+    <button id="exp">匯出 CSV</button>
+    <button class="danger" id="clr">清除所有投票資料</button>
+  </div>
+  <div class="tag">活動開始前務必清除測試資料。清除為不可復原操作。</div>
+</div>
+
+<script>
+/* ===================== 設定區（需與投票端一致） ===================== */
+const FB_CONFIG = {
+  apiKey:            "AIzaSyDl_NqANwk_lsfEL5kOyC1RJi29DLvGPU8",
+  authDomain:        "kuya-candy-game.firebaseapp.com",
+  databaseURL:       "https://kuya-candy-game-default-rtdb.firebaseio.com",
+  projectId:         "kuya-candy-game",
+  storageBucket:     "kuya-candy-game.firebasestorage.app",
+  messagingSenderId: "105923267148",
+  appId:             "1:105923267148:web:1f0e0db9de8cc2876c42e9"
+};
+const DB_ROOT    = "predict";
+const ADMIN_PASS = "kuya2026";
+const CANDIDATES = [
+  {no:1,name:"第一隊"},{no:2,name:"第二隊"},{no:3,name:"第三隊"},
+  {no:4,name:"第四隊"},{no:5,name:"第五隊"},{no:6,name:"第六隊"},
+  {no:7,name:"第七隊"},{no:8,name:"第八隊"},{no:9,name:"第九隊"},
+  {no:10,name:"第十隊"}
+];
+/* ================================================================== */
+
+const DEMO=!FB_CONFIG.apiKey||FB_CONFIG.apiKey.indexOf("PASTE")===0;
+const LS_VOTES="predict_local_votes";
+let db=null,cur={};
+
+function tally(votes){
+  cur=votes||{};
+  const counts={}; let voters=0;
+  Object.keys(cur).forEach(k=>{
+    const p=cur[k]&&cur[k].picks; if(!Array.isArray(p))return;
+    voters++; p.forEach(no=>counts[no]=(counts[no]||0)+1);
+  });
+  const arr=CANDIDATES.map(c=>({...c,v:counts[c.no]||0}))
+    .sort((a,b)=>b.v-a.v||a.no-b.no);
+  const total=arr.reduce((s,x)=>s+x.v,0);
+  document.getElementById("nVoters").textContent=voters;
+  document.getElementById("nVotes").textContent=total;
+  document.getElementById("lead").textContent = total? arr[0].name : "—";
+  document.getElementById("tb").innerHTML=arr.map((x,i)=>
+    '<tr><td>'+(i+1)+'</td><td>NO.'+x.no+'</td><td>'+x.name+'</td>'+
+    '<td class="r">'+x.v+'</td><td class="r">'+(total?(x.v/total*100).toFixed(1):"0.0")+'%</td></tr>'
+  ).join("");
+  window.__arr=arr; window.__total=total;
+}
+
+if(DEMO){
+  document.getElementById("modeTag").textContent="DEMO 模式（未接 Firebase，讀本機資料）";
+  const read=()=>tally(JSON.parse(localStorage.getItem(LS_VOTES)||"{}"));
+  read(); setInterval(read,1000);
+  document.getElementById("clr").onclick=()=>{
+    if(prompt("輸入管理密碼以清除全部投票")!==ADMIN_PASS) return;
+    if(!confirm("確定清除所有投票資料？此操作不可復原")) return;
+    localStorage.removeItem(LS_VOTES); read();
+  };
+}else{
+  document.getElementById("modeTag").textContent="Firebase 連線中 ・ 節點 "+DB_ROOT;
+  firebase.initializeApp(FB_CONFIG); db=firebase.database();
+  db.ref(DB_ROOT+"/votes").on("value",s=>tally(s.val()||{}));
+  document.getElementById("clr").onclick=async()=>{
+    if(prompt("輸入管理密碼以清除全部投票")!==ADMIN_PASS) return;
+    if(!confirm("確定清除所有投票資料？此操作不可復原")) return;
+    try{ await db.ref(DB_ROOT+"/votes").remove(); alert("已清除"); }
+    catch(e){ alert("清除失敗："+e.message); }
+  };
+}
+
+document.getElementById("exp").onclick=()=>{
+  const arr=window.__arr||[], total=window.__total||0;
+  let csv="\uFEFF名次,編號,參賽者,票數,得票率\n";
+  arr.forEach((x,i)=>{csv+=[(i+1),x.no,x.name,x.v,(total?(x.v/total*100).toFixed(1):"0.0")+"%"].join(",")+"\n";});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="predict_result.csv"; a.click();
+};
+</script>
+</body>
+</html>
