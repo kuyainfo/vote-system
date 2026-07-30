@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>公布結果 - 控制器</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{--bg:#0b1020;--gold:#f5c451;--txt:#eef1fa;--sub:#98a2c4;--line:#2c3557}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:radial-gradient(120% 60% at 50% 0%,#1d2748 0%,var(--bg) 60%);color:var(--txt);
+  font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+.kick{font-size:12px;letter-spacing:.5em;color:var(--gold);margin-bottom:10px}
+h1{font-size:26px;letter-spacing:.1em;margin-bottom:8px}
+.desc{font-size:14px;color:var(--sub);line-height:1.8;margin-bottom:38px}
+
+.big{width:min(78vw,320px);height:min(78vw,320px);border-radius:50%;border:none;cursor:pointer;
+  background:linear-gradient(160deg,var(--gold),#e0a92f);color:#241a00;
+  font-family:inherit;font-size:30px;font-weight:800;letter-spacing:.1em;
+  box-shadow:0 0 0 10px rgba(245,196,81,.10),0 20px 50px rgba(245,196,81,.25);
+  transition:.18s;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px}
+.big:active{transform:scale(.96)}
+.big .sm{font-size:13px;font-weight:600;letter-spacing:.3em;opacity:.7}
+.big:disabled{background:#242c4a;color:#5c668c;box-shadow:none;cursor:default}
+
+.state{margin-top:34px;display:inline-flex;align-items:center;gap:9px;padding:9px 18px;border-radius:22px;
+  border:1px solid var(--line);background:rgba(21,28,51,.7);font-size:13px;color:var(--sub)}
+.state .d{width:9px;height:9px;border-radius:50%;background:#8e9ac0}
+.state.run .d{background:var(--gold);box-shadow:0 0 9px var(--gold)}
+.state.off .d{background:#e0555f}
+.note{margin-top:16px;font-size:11px;color:#4d5678;letter-spacing:.1em;line-height:1.9;max-width:340px}
+
+.confirm{position:fixed;inset:0;background:rgba(8,13,28,.92);display:none;
+  align-items:center;justify-content:center;flex-direction:column;padding:28px;z-index:50}
+.confirm.on{display:flex}
+.confirm h2{font-size:22px;margin-bottom:12px;letter-spacing:.06em}
+.confirm p{font-size:14px;color:var(--sub);line-height:1.8;margin-bottom:28px}
+.confirm .btns{display:flex;gap:12px}
+.confirm button{padding:15px 30px;border-radius:11px;font-family:inherit;font-size:16px;font-weight:700;
+  border:1px solid var(--line);background:#1b2340;color:var(--txt)}
+.confirm button.yes{background:linear-gradient(160deg,var(--gold),#e0a92f);color:#241a00;border:none}
+</style>
+</head>
+<body>
+
+<div class="kick">HOST CONTROLLER</div>
+<h1>公布結果</h1>
+<div class="desc">按下後投影畫面立即開始揭曉<br>第三名 → 第二名 → 第一名 → 頒獎台</div>
+
+<button class="big" id="btn">
+  公布結果
+  <span class="sm">REVEAL</span>
+</button>
+
+<div class="state" id="stateBox"><span class="d"></span><span id="stateTxt">連線中…</span></div>
+<div class="note">此頁僅供工作人員操作，請勿提供給觀眾。<br>需重播時，請至後台按「重置揭曉狀態」。</div>
+
+<div class="confirm" id="cf">
+  <h2>確定要公布結果？</h2>
+  <p>投影畫面會立刻開始播放揭曉動畫，<br>播放中無法中止。</p>
+  <div class="btns">
+    <button id="no">取消</button>
+    <button class="yes" id="yes">確定公布</button>
+  </div>
+</div>
+
+<script>
+/* ===================== 設定區 ===================== */
+const FB_CONFIG = {
+  apiKey:            "AIzaSyDl_NqANwk_lsfEL5kOyC1RJi29DLvGPU8",
+  authDomain:        "kuya-candy-game.firebaseapp.com",
+  databaseURL:       "https://kuya-candy-game-default-rtdb.firebaseio.com",
+  projectId:         "kuya-candy-game",
+  storageBucket:     "kuya-candy-game.firebasestorage.app",
+  messagingSenderId: "105923267148",
+  appId:             "1:105923267148:web:1f0e0db9de8cc2876c42e9"
+};
+const DB_ROOT = "result";
+/* ================================================== */
+
+firebase.initializeApp(FB_CONFIG);
+const db=firebase.database();
+
+const btn=document.getElementById("btn");
+const box=document.getElementById("stateBox");
+const txt=document.getElementById("stateTxt");
+const cf=document.getElementById("cf");
+let running=false, online=true;
+
+function sync(){
+  box.classList.toggle("run", running && online);
+  box.classList.toggle("off", !online);
+  if(!online){ txt.textContent="連線中斷，請檢查網路"; }
+  else txt.textContent = running ? "已公布" : "待命中";
+  btn.disabled = running || !online;
+  btn.childNodes[0].nodeValue = running ? "已公布" : "公布結果";
+}
+
+db.ref(DB_ROOT+"/reveal").on("value", s=>{ running = (s.val()==="running"); sync(); });
+db.ref(".info/connected").on("value", s=>{ online=!!s.val(); sync(); });
+
+btn.onclick = ()=>{ if(!btn.disabled) cf.classList.add("on"); };
+document.getElementById("no").onclick = ()=> cf.classList.remove("on");
+document.getElementById("yes").onclick = async ()=>{
+  cf.classList.remove("on");
+  btn.disabled=true;
+  try{
+    await db.ref(DB_ROOT).update({ reveal:"running", revealAt: firebase.database.ServerValue.TIMESTAMP });
+  }catch(e){
+    alert("公布失敗："+e.message+"\n請重試");
+    btn.disabled=false;
+  }
+};
+</script>
+</body>
+</html>
