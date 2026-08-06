@@ -16,6 +16,8 @@ h1{font-size:20px;letter-spacing:.08em;margin-bottom:4px}
   border:1px solid #2c3557;background:#151c33;font-size:13px;margin-bottom:20px}
 .state .d{width:9px;height:9px;border-radius:50%;background:#8e9ac0}
 .state.run .d{background:#f5c451;box-shadow:0 0 8px #f5c451}
+.states{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.states .state{margin-bottom:0}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:24px}
 .panel{background:#151c33;border:1px solid #2c3557;border-radius:12px;padding:16px}
 .panel h2{font-size:12px;letter-spacing:.24em;color:#8e9ac0;font-weight:600;margin-bottom:14px}
@@ -34,7 +36,7 @@ th{font-size:11px;letter-spacing:.18em;color:#8e9ac0;font-weight:600}
 td.r{text-align:right;font-variant-numeric:tabular-nums}
 tr:last-child td{border-bottom:none}
 .medal{font-weight:800}
-.m1{color:#f5c451}.m2{color:#cfd8ec}.m3{color:#d79a5b}
+.m1{color:#f5c451}.m2{color:#cfd8ec}.m3{color:#d79a5b}.m4{color:#6fd39b;font-size:12px;letter-spacing:.1em}
 .acts{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
 button{padding:11px 18px;border-radius:9px;border:1px solid #2c3557;background:#1b2340;color:#eef1fa;
   font-family:inherit;font-size:14px;cursor:pointer}
@@ -51,7 +53,10 @@ button.danger{background:#3a1d24;border-color:#77303f;color:#ffc9d2}
   <h1>實際結果 ・ 後台輸入</h1>
   <div class="sub" id="modeTag">—</div>
 
-  <div class="state" id="stateBox"><span class="d"></span><span id="stateTxt">讀取中…</span></div>
+  <div class="states">
+    <div class="state" id="stateTop3"><span class="d"></span><span id="txtTop3">讀取中…</span></div>
+    <div class="state" id="statePot"><span class="d"></span><span id="txtPot">讀取中…</span></div>
+  </div>
 
   <div class="cols">
     <div class="panel">
@@ -69,14 +74,16 @@ button.danger{background:#3a1d24;border-color:#77303f;color:#ffc9d2}
 
   <div class="acts">
     <button class="primary" id="save">儲存金額</button><span class="saved" id="saved">已儲存</span>
-    <button id="reset">重置揭曉狀態（可重播）</button>
+    <button id="resetTop3">重置前三名狀態</button>
+    <button id="resetPot">重置最佳潛力獎狀態</button>
     <button class="danger" id="clr">清除所有金額</button>
   </div>
 
   <div class="tag">
     金額單位為萬元整數，未輸入視為 0。<br>
-    投影畫面只會在「公布結果」按下後才播放，儲存金額不會觸發動畫。<br>
-    要重播動畫：先按「重置揭曉狀態」，投影會回到等待畫面，控制器即可再按一次。
+    投影畫面只會在控制器按下後才播放，儲存金額不會觸發動畫。<br>
+    最佳潛力獎取排名第 4 名，畫面只顯示 LOGO 與公司名稱，不顯示名次與金額。<br>
+    要重播：按對應的重置按鈕，該投影會回到等待畫面，控制器該顆按鈕也會復原。
   </div>
 </div>
 
@@ -136,7 +143,7 @@ function preview(){
   const a=current();
   const arr=TEAMS.map(t=>({...t,v:a[t.no]||0})).sort((x,y)=>y.v-x.v||x.no-y.no);
   document.getElementById("tb").innerHTML = arr.map((x,i)=>
-    '<tr><td class="medal '+(i<3?"m"+(i+1):"")+'">'+(i+1)+'</td>'+
+    '<tr><td class="medal '+(i<3?"m"+(i+1):(i===3?"m4":""))+'">'+(i===3?"潛力":(i+1))+'</td>'+
     '<td><span class="dot" style="background:'+x.color+';display:inline-block;margin-right:8px;vertical-align:-2px"></span>'+x.name+'</td>'+
     '<td class="r">'+x.v.toLocaleString()+'</td></tr>').join("");
 }
@@ -155,9 +162,13 @@ db.ref(DB_ROOT+"/amounts").on("value", s=>{
 
 db.ref(DB_ROOT+"/reveal").on("value", s=>{
   const running = s.val()==="running";
-  const box=document.getElementById("stateBox");
-  box.classList.toggle("run",running);
-  document.getElementById("stateTxt").textContent = running ? "已公布，投影播放中／已完成" : "待命中，投影顯示等待畫面";
+  document.getElementById("stateTop3").classList.toggle("run",running);
+  document.getElementById("txtTop3").textContent = running ? "前三名：已公布" : "前三名：待命中";
+});
+db.ref(DB_ROOT+"/potential").on("value", s=>{
+  const running = s.val()==="running";
+  document.getElementById("statePot").classList.toggle("run",running);
+  document.getElementById("txtPot").textContent = running ? "最佳潛力獎：已公布" : "最佳潛力獎：待命中";
 });
 
 document.getElementById("save").onclick = async ()=>{
@@ -168,9 +179,15 @@ document.getElementById("save").onclick = async ()=>{
   }catch(e){ alert("儲存失敗："+e.message); }
 };
 
-document.getElementById("reset").onclick = async ()=>{
-  if(!confirm("重置揭曉狀態？投影畫面會回到等待結果。")) return;
+document.getElementById("resetTop3").onclick = async ()=>{
+  if(!confirm("重置前三名狀態？投影-1 會回到等待結果。")) return;
   try{ await db.ref(DB_ROOT).update({reveal:"idle", revealAt:0}); }
+  catch(e){ alert("重置失敗："+e.message); }
+};
+
+document.getElementById("resetPot").onclick = async ()=>{
+  if(!confirm("重置最佳潛力獎狀態？投影-2 會回到等待結果。")) return;
+  try{ await db.ref(DB_ROOT).update({potential:"idle", potentialAt:0}); }
   catch(e){ alert("重置失敗："+e.message); }
 };
 
