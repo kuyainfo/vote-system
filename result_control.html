@@ -4,67 +4,89 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>公布結果 - 控制器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
-:root{--bg:#0b1020;--gold:#f5c451;--txt:#eef1fa;--sub:#98a2c4;--line:#2c3557}
+:root{--g1:#f25bd6;--g2:#8b7bff;--g3:#34e4f2;--txt:#fff;--sub:rgba(225,232,255,.75);--line:rgba(255,255,255,.18)}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%}
-body{background:radial-gradient(120% 60% at 50% 0%,#1d2748 0%,var(--bg) 60%);color:var(--txt);
-  font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+html,body{min-height:100%}
+html{background:#070b2e}
+body{min-height:100vh;color:var(--txt);
+  background:linear-gradient(180deg,rgba(6,10,40,.45),rgba(6,10,40,.78)),url("assets/bg_02.jpg") center/cover no-repeat;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
   display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
-.kick{font-size:12px;letter-spacing:.5em;color:var(--gold);margin-bottom:10px}
-h1{font-size:26px;letter-spacing:.1em;margin-bottom:8px}
-.desc{font-size:14px;color:var(--sub);line-height:1.8;margin-bottom:38px}
+.kick{font-size:12px;letter-spacing:.5em;color:var(--g3);margin-bottom:10px;font-weight:700}
+h1{font-size:26px;letter-spacing:.1em;margin-bottom:8px;font-weight:900}
+.desc{font-size:14px;color:var(--sub);line-height:1.8;margin-bottom:22px}
+
+.steps{display:flex;gap:8px;justify-content:center;margin-bottom:30px}
+.steps i{width:34px;height:6px;border-radius:3px;background:rgba(255,255,255,.16);transition:background .3s}
+.steps i.done{background:linear-gradient(90deg,var(--g1),var(--g3));box-shadow:0 0 8px rgba(52,228,242,.6)}
 
 .big{width:min(78vw,320px);height:min(78vw,320px);border-radius:50%;border:none;cursor:pointer;
-  background:linear-gradient(160deg,var(--gold),#e0a92f);color:#241a00;
-  font-family:inherit;font-size:30px;font-weight:800;letter-spacing:.1em;
-  box-shadow:0 0 0 10px rgba(245,196,81,.10),0 20px 50px rgba(245,196,81,.25);
-  transition:.18s;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px}
-.big:active{transform:scale(.96)}
-.big .sm{font-size:13px;font-weight:600;letter-spacing:.3em;opacity:.7}
-.big:disabled{background:#242c4a;color:#5c668c;box-shadow:none;cursor:default}
+  background:linear-gradient(135deg,var(--g1),var(--g2) 50%,var(--g3));color:#fff;
+  font-family:inherit;font-size:30px;font-weight:900;letter-spacing:.08em;
+  text-shadow:0 3px 12px rgba(40,20,120,.45);
+  animation:breathe 2.6s ease-in-out infinite;transition:transform .18s;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px}
+.big:active{transform:scale(.94)}
+.big .sm{font-size:13px;font-weight:700;letter-spacing:.3em;opacity:.85}
+.big:disabled{background:rgba(40,46,100,.72);color:rgba(255,255,255,.4);box-shadow:none;
+  animation:none;text-shadow:none;cursor:default}
+@keyframes breathe{
+  0%,100%{box-shadow:0 0 0 10px rgba(255,255,255,.08),0 0 40px rgba(139,123,255,.5)}
+  50%{box-shadow:0 0 0 18px rgba(255,255,255,.05),0 0 80px rgba(52,228,242,.7)}}
 
-.state{margin-top:34px;display:inline-flex;align-items:center;gap:9px;padding:9px 18px;border-radius:22px;
-  border:1px solid var(--line);background:rgba(21,28,51,.7);font-size:13px;color:var(--sub)}
-.state .d{width:9px;height:9px;border-radius:50%;background:#8e9ac0}
-.state.run .d{background:var(--gold);box-shadow:0 0 9px var(--gold)}
-.state.off .d{background:#e0555f}
-.note{margin-top:16px;font-size:11px;color:#4d5678;letter-spacing:.1em;line-height:1.9;max-width:340px}
+.state{margin-top:30px;display:inline-flex;align-items:center;gap:9px;padding:9px 18px;border-radius:22px;
+  border:1px solid var(--line);background:rgba(20,24,92,.45);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-size:13px;color:var(--sub)}
+.state .d{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.5)}
+.state.run .d{background:var(--g3);box-shadow:0 0 9px var(--g3)}
+.state.off .d{background:#ff6b7a}
+.note{margin-top:16px;font-size:11px;color:rgba(225,232,255,.5);letter-spacing:.1em;line-height:1.9;max-width:340px}
 
-.confirm{position:fixed;inset:0;background:rgba(8,13,28,.92);display:none;
-  align-items:center;justify-content:center;flex-direction:column;padding:28px;z-index:50}
-.confirm.on{display:flex}
-.confirm h2{font-size:22px;margin-bottom:12px;letter-spacing:.06em}
-.confirm p{font-size:14px;color:var(--sub);line-height:1.8;margin-bottom:28px}
-.confirm .btns{display:flex;gap:12px}
-.confirm button{padding:15px 30px;border-radius:11px;font-family:inherit;font-size:16px;font-weight:700;
-  border:1px solid var(--line);background:#1b2340;color:var(--txt)}
-.confirm button.yes{background:linear-gradient(160deg,var(--gold),#e0a92f);color:#241a00;border:none}
+/* 投影同步畫面 */
+.mirror{position:fixed;inset:0;z-index:50;background:rgba(6,9,34,.96);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;
+  opacity:0;pointer-events:none;transition:opacity .25s}
+.mirror.on{opacity:1;pointer-events:auto}
+.mirror .mk{font-size:12px;letter-spacing:.5em;color:var(--g3);margin-bottom:8px;font-weight:700}
+.mirror h2{font-size:20px;letter-spacing:.08em;margin-bottom:18px;font-weight:900}
+.frame{position:relative;width:min(92vw,640px,calc((100vh - 170px) * 16 / 9));aspect-ratio:16/9;overflow:hidden;
+  border-radius:10px;border:1px solid var(--line);background:#050926;box-shadow:0 0 40px rgba(139,123,255,.35)}
+.frame iframe{position:absolute;left:0;top:0;width:1920px;height:1080px;border:0;
+  transform-origin:0 0;pointer-events:none}
+.bar{width:min(92vw,640px,calc((100vh - 170px) * 16 / 9));height:4px;border-radius:2px;background:rgba(255,255,255,.12);margin-top:18px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--g1),var(--g3))}
+@keyframes fill{from{width:0}to{width:100%}}
+.mirror p{font-size:12px;color:var(--sub);margin-top:10px;letter-spacing:.1em}
 </style>
 </head>
 <body>
 
 <div class="kick">HOST CONTROLLER</div>
 <h1>公布結果</h1>
-<div class="desc">按下後投影畫面立即開始揭曉<br>第三名 → 第二名 → 第一名 → 頒獎台</div>
+<div class="desc">每按一次，投影推進一步<br>第三名 → 第二名 → 第一名 → 前三名總覽</div>
+<div class="steps" id="steps"><i></i><i></i><i></i><i></i></div>
 
 <button class="big" id="btn">
-  公布結果
-  <span class="sm">REVEAL</span>
+  <span id="btnLb">揭曉第三名</span>
+  <span class="sm" id="btnSm">STEP 1 / 4</span>
 </button>
 
 <div class="state" id="stateBox"><span class="d"></span><span id="stateTxt">連線中…</span></div>
 <div class="note">此頁僅供工作人員操作，請勿提供給觀眾。<br>需重播時，請至後台按「重置揭曉狀態」。</div>
 
-<div class="confirm" id="cf">
-  <h2>確定要公布結果？</h2>
-  <p>投影畫面會立刻開始播放揭曉動畫，<br>播放中無法中止。</p>
-  <div class="btns">
-    <button id="no">取消</button>
-    <button class="yes" id="yes">確定公布</button>
-  </div>
+<!-- 按下後顯示：縮小版投影畫面（直接嵌入 result_screen.html，視覺改版後自動同步） -->
+<div class="mirror" id="mirror">
+  <div class="mk">LIVE SCREEN</div>
+  <h2 id="mTitle">投影同步中</h2>
+  <div class="frame" id="frame"><iframe id="scr" src="result_screen.html" title="投影畫面" tabindex="-1"></iframe></div>
+  <div class="bar"><i id="barFill"></i></div>
+  <p id="mBack">4 秒後自動返回按鈕畫面</p>
 </div>
 
 <script>
@@ -78,40 +100,78 @@ const FB_CONFIG = {
   messagingSenderId: "105923267148",
   appId:             "1:105923267148:web:1f0e0db9de8cc2876c42e9"
 };
-const DB_ROOT = "result";
+const DB_ROOT   = "result";
+const STEP_MAX  = 4;
+const MIRROR_FIRST_MS = 5000;   /* 第 1 下同步畫面停留時間（含投影按鈕動畫） */
+const MIRROR_MS       = 4000;   /* 其他步驟同步畫面停留時間 */
+const LABELS  = ["揭曉第三名","揭曉第二名","揭曉第一名","前三名總覽"];
+const SHOWING = ["等待畫面","第三名","第二名","第一名","前三名總覽"];
 /* ================================================== */
 
 firebase.initializeApp(FB_CONFIG);
 const db=firebase.database();
 
-const btn=document.getElementById("btn");
-const box=document.getElementById("stateBox");
-const txt=document.getElementById("stateTxt");
-const cf=document.getElementById("cf");
-let running=false, online=true;
+const $=id=>document.getElementById(id);
+const btn=$("btn"), box=$("stateBox"), txt=$("stateTxt"), mirror=$("mirror");
+let step=0, online=true, busy=false, backTimer=null;
 
 function sync(){
-  box.classList.toggle("run", running && online);
+  const done = step>=STEP_MAX;
+  box.classList.toggle("run", step>0 && online);
   box.classList.toggle("off", !online);
-  if(!online){ txt.textContent="連線中斷，請檢查網路"; }
-  else txt.textContent = running ? "已公布" : "待命中";
-  btn.disabled = running || !online;
-  btn.childNodes[0].nodeValue = running ? "已公布" : "公布結果";
+  txt.textContent = !online ? "連線中斷，請檢查網路" : ("投影目前：" + SHOWING[step]);
+  $("btnLb").textContent = done ? "已全部公布" : LABELS[step];
+  $("btnSm").textContent = done ? "COMPLETE" : ("STEP " + (step+1) + " / " + STEP_MAX);
+  btn.disabled = done || !online || busy;
+  $("steps").querySelectorAll("i").forEach((el,i)=>el.classList.toggle("done", i<step));
 }
 
-db.ref(DB_ROOT+"/reveal").on("value", s=>{ running = (s.val()==="running"); sync(); });
+function fitFrame(){
+  const w=$("frame").clientWidth;
+  if(w) $("scr").style.transform="scale("+(w/1920)+")";
+}
+window.addEventListener("resize", fitFrame);
+fitFrame();
+
+function openMirror(title, ms){
+  $("mTitle").textContent = title;
+  $("mBack").textContent = (ms/1000) + " 秒後自動返回按鈕畫面";
+  const bar=$("barFill");
+  bar.style.animation="none"; void bar.offsetWidth;
+  bar.style.animation="fill "+ms+"ms linear forwards";
+  mirror.classList.add("on");
+  fitFrame();
+  clearTimeout(backTimer);
+  backTimer=setTimeout(closeMirror, ms);
+}
+function closeMirror(){
+  mirror.classList.remove("on");
+  busy=false;
+  sync();
+}
+
+db.ref(DB_ROOT+"/step").on("value", s=>{
+  const v=parseInt(s.val(),10);
+  step = isNaN(v) ? 0 : Math.max(0, Math.min(STEP_MAX, v));
+  sync();
+});
 db.ref(".info/connected").on("value", s=>{ online=!!s.val(); sync(); });
 
-btn.onclick = ()=>{ if(!btn.disabled) cf.classList.add("on"); };
-document.getElementById("no").onclick = ()=> cf.classList.remove("on");
-document.getElementById("yes").onclick = async ()=>{
-  cf.classList.remove("on");
-  btn.disabled=true;
+btn.onclick = async ()=>{
+  if(btn.disabled) return;
+  const next=Math.min(step+1, STEP_MAX);
+  busy=true; sync();
+  openMirror("投影：" + SHOWING[next], next===1 ? MIRROR_FIRST_MS : MIRROR_MS);
   try{
-    await db.ref(DB_ROOT).update({ reveal:"running", revealAt: firebase.database.ServerValue.TIMESTAMP });
+    const r = await db.ref(DB_ROOT+"/step").transaction(v=>{
+      v = parseInt(v,10) || 0;
+      return v>=STEP_MAX ? undefined : v+1;
+    });
+    if(r.committed) $("mTitle").textContent = "投影：" + SHOWING[r.snapshot.val()];
   }catch(e){
-    alert("公布失敗："+e.message+"\n請重試");
-    btn.disabled=false;
+    clearTimeout(backTimer);
+    closeMirror();
+    alert("推進失敗：" + e.message + "\n請重試");
   }
 };
 </script>

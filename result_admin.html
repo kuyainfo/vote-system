@@ -75,8 +75,8 @@ button.danger{background:#3a1d24;border-color:#77303f;color:#ffc9d2}
 
   <div class="tag">
     金額單位為萬元整數，未輸入視為 0。<br>
-    投影畫面只會在「公布結果」按下後才播放，儲存金額不會觸發動畫。<br>
-    要重播動畫：先按「重置揭曉狀態」，投影會回到等待畫面，控制器即可再按一次。
+    投影畫面由控制器逐步推進（第三名 → 第二名 → 第一名 → 前三名總覽），儲存金額不會觸發揭曉。<br>
+    要重播：先按「重置揭曉狀態」，投影會回到等待畫面，控制器從第三名重新開始。
   </div>
 </div>
 
@@ -94,16 +94,16 @@ const FB_CONFIG = {
 const DB_ROOT    = "result";
 const ADMIN_PASS = "kuya2026";
 const TEAMS = [
-  {no:1,  name:"增站運籌科技",       color:"#e5484d"},
-  {no:2,  name:"超妡科技",         color:"#e5793a"},
-  {no:3,  name:"睿加科技",       color:"#f5c451"},
-  {no:4,  name:"信誠金融科技", color:"#8fbf3f"},
-  {no:5,  name:"律果科技",      color:"#3fbf86"},
-  {no:6,  name:"內定",   color:"#3fb5bf"},
-  {no:7,  name:"台灣碳梭科技",        color:"#4a8ff0"},
-  {no:8,  name:"科淨能源",      color:"#6f6ff0"},
-  {no:9,  name:"繁晶科技",     color:"#a45ff0"},
-  {no:10, name:"電電數位",        color:"#e05fae"}
+  {no:1,  name:"星相科技股份有限公司",       color:"#e5484d"},
+  {no:2,  name:"長瑩生技股份有限公司",       color:"#e5793a"},
+  {no:3,  name:"零邁移動服務股份有限公司",   color:"#f5c451"},
+  {no:4,  name:"臻至科技有限公司",           color:"#8fbf3f"},
+  {no:5,  name:"台灣若美科技股份有限公司",   color:"#3fbf86"},
+  {no:6,  name:"超術感醫學科技股份有限公司", color:"#3fb5bf"},
+  {no:7,  name:"岳鼎智慧能源股份有限公司",   color:"#4a8ff0"},
+  {no:8,  name:"多多多比有限公司",           color:"#6f6ff0"},
+  {no:9,  name:"越創科技股份有限公司",       color:"#a45ff0"},
+  {no:10, name:"寵訊生醫股份有限公司",       color:"#e05fae"}
 ];
 /* ================================================== */
 
@@ -153,11 +153,12 @@ db.ref(DB_ROOT+"/amounts").on("value", s=>{
   preview();
 });
 
-db.ref(DB_ROOT+"/reveal").on("value", s=>{
-  const running = s.val()==="running";
+const STEP_TXT = ["待命中，投影顯示等待畫面","已揭曉第三名","已揭曉第二名","已揭曉第一名","已全部公布，投影顯示前三名總覽"];
+db.ref(DB_ROOT+"/step").on("value", s=>{
+  let v=parseInt(s.val(),10); if(isNaN(v)) v=0; v=Math.max(0,Math.min(4,v));
   const box=document.getElementById("stateBox");
-  box.classList.toggle("run",running);
-  document.getElementById("stateTxt").textContent = running ? "已公布，投影播放中／已完成" : "待命中，投影顯示等待畫面";
+  box.classList.toggle("run", v>0);
+  document.getElementById("stateTxt").textContent = STEP_TXT[v];
 });
 
 document.getElementById("save").onclick = async ()=>{
@@ -170,7 +171,7 @@ document.getElementById("save").onclick = async ()=>{
 
 document.getElementById("reset").onclick = async ()=>{
   if(!confirm("重置揭曉狀態？投影畫面會回到等待結果。")) return;
-  try{ await db.ref(DB_ROOT).update({reveal:"idle", revealAt:0}); }
+  try{ await db.ref(DB_ROOT).update({step:0, reveal:null, revealAt:null, potential:null, potentialAt:null}); }
   catch(e){ alert("重置失敗："+e.message); }
 };
 
