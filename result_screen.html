@@ -23,7 +23,7 @@ html,body{height:100%;overflow:hidden;background:#050926;color:#fff;
 .layer.on{opacity:1}
 
 /* 等待畫面：公布結果按鈕（僅顯示，由手機控制） */
-#idle,#top3{display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:240px}
+#idle{display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:240px}
 .ph-kick{font-size:22px;letter-spacing:.8em;color:var(--g3);margin-bottom:28px;font-weight:700}
 .ph-h1{font-size:92px;letter-spacing:.18em;font-weight:900;text-shadow:0 0 40px rgba(139,123,255,.6)}
 .pbtn{position:relative;width:440px;height:440px;border-radius:50%;
@@ -41,8 +41,31 @@ html,body{height:100%;overflow:hidden;background:#050926;color:#fff;
 .pbtn.press::before{animation:ripple .9s ease-out both}
 @keyframes press{0%{transform:scale(1)}25%{transform:scale(.86)}60%{transform:scale(1.05)}100%{transform:scale(1)}}
 @keyframes ripple{0%{opacity:.95;transform:scale(1)}100%{opacity:0;transform:scale(2)}}
-.ph-tag{margin-top:44px;padding:14px 36px;border:3px dashed rgba(255,255,255,.35);border-radius:14px;
-  font-size:26px;letter-spacing:.4em;color:var(--sub)}
+/* 前三名總覽：頒獎台 */
+.stands{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:flex-end;gap:70px}
+.stand{width:460px;display:flex;flex-direction:column;align-items:center;opacity:0;transform:translateY(160px)}
+.stand.rise{animation:rise .9s cubic-bezier(.2,1,.25,1) forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+.cw{border-radius:50%;padding:7px;background:linear-gradient(135deg,var(--g1),var(--g2),var(--g3));
+  box-shadow:0 0 50px rgba(139,123,255,.55)}
+.cw .chip{display:block;width:196px;height:196px;border-radius:50%;background:#fff;object-fit:cover}
+.p1 .cw .chip{width:236px;height:236px}
+.p1.rise .cw{animation:landPop .7s .85s cubic-bezier(.3,1.6,.5,1) both}
+.stand .nm{width:440px;margin-top:20px;text-align:center;white-space:nowrap;font-size:44px;font-weight:900;
+  line-height:1.25;letter-spacing:.02em}
+.stand .amt{margin-top:6px;font-size:68px;font-weight:900;line-height:1.05;font-variant-numeric:tabular-nums;
+  text-shadow:0 0 30px rgba(52,228,242,.55)}
+.stand .amt small{font-size:28px;margin-left:8px;font-weight:700;color:var(--sub);text-shadow:none}
+.blk{width:100%;margin-top:22px;border:4px solid transparent;border-bottom:none;border-radius:36px 36px 0 0;
+  background:linear-gradient(var(--glass),var(--glass)) padding-box,
+             linear-gradient(100deg,var(--g1),var(--g2) 50%,var(--g3)) border-box;
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  box-shadow:0 0 44px rgba(139,123,255,.38);display:flex;justify-content:center;padding-top:22px}
+.blk .no{font-size:140px;font-weight:900;line-height:1}
+.p1 .blk{height:300px}
+.p2 .blk{height:220px}
+.p3 .blk{height:160px}
+.p3 .blk .no{font-size:110px}
 
 /* 開獎畫面 */
 .glass{position:absolute;border:4px solid transparent;border-radius:44px;
@@ -103,11 +126,13 @@ html,body{height:100%;overflow:hidden;background:#050926;color:#fff;
     </div>
   </div>
 
-  <!-- 前三名總覽：視覺待設計，目前為佔位畫面 -->
+  <!-- 前三名總覽：頒獎台（左二、中一、右三） -->
   <div class="layer" id="top3">
-    <div class="ph-kick">TOP 3</div>
-    <div class="ph-h1">前三名總覽</div>
-    <div class="ph-tag">畫面設計中</div>
+    <div class="stands">
+      <div class="stand p2" id="st2"><div class="cw"><img class="chip" alt=""></div><div class="nm">—</div><div class="amt">0<small>萬</small></div><div class="blk"><span class="no r2">2</span></div></div>
+      <div class="stand p1" id="st1"><div class="cw"><img class="chip" alt=""></div><div class="nm">—</div><div class="amt">0<small>萬</small></div><div class="blk"><span class="no r1">1</span></div></div>
+      <div class="stand p3" id="st3"><div class="cw"><img class="chip" alt=""></div><div class="nm">—</div><div class="amt">0<small>萬</small></div><div class="blk"><span class="no r3">3</span></div></div>
+    </div>
   </div>
 
   <div class="warn" id="warn">連線中斷</div>
@@ -227,6 +252,50 @@ function showStage(rank){
   countUp(win.v, my);
 }
 
+/* 頒獎台：名稱過長先縮字級，仍放不下才換兩行 */
+function fitStandName(el){
+  el.style.whiteSpace="nowrap";
+  let s=44; el.style.fontSize=s+"px";
+  while(el.scrollWidth>el.clientWidth && s>30){ s-=2; el.style.fontSize=s+"px"; }
+  if(el.scrollWidth>el.clientWidth){ el.style.whiteSpace="normal"; el.style.fontSize="34px"; }
+}
+function countTo(el, to, dur, my){
+  const t0=performance.now();
+  (function run(now){
+    if(my!==token) return;
+    const p=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-p,3);
+    el.innerHTML=Math.round(to*e).toLocaleString()+"<small>萬</small>";
+    if(p<1) requestAnimationFrame(run);
+  })(t0);
+}
+const RISE_DELAY = {3:0, 2:800, 1:1600};   /* 依序升起：第三 → 第二 → 第一（毫秒） */
+function showTop3(){
+  const my=++token, arr=ranked();
+  [1,2,3].forEach(r=>{
+    const t=arr[r-1], el=$("st"+r);
+    el.classList.remove("rise");
+    el.style.visibility = t ? "" : "hidden";
+    if(!t) return;
+    el.querySelector(".chip").src=t.logo;
+    const nm=el.querySelector(".nm");
+    nm.textContent=t.name;
+    fitStandName(nm);
+    el.querySelector(".amt").innerHTML="0<small>萬</small>";
+  });
+  show("top3");
+  [3,2,1].forEach(r=>{
+    const t=arr[r-1];
+    if(!t) return;
+    setTimeout(()=>{
+      if(my!==token) return;
+      const el=$("st"+r);
+      void el.offsetWidth;
+      el.classList.add("rise");
+      countTo(el.querySelector(".amt"), t.v, 900, my);
+    }, RISE_DELAY[r]);
+  });
+}
+
 function render(withPress){
   if(!amountsReady) return;
   clearTimeout(pressTimer);
@@ -241,14 +310,15 @@ function render(withPress){
     return;
   }
   if(step>=1 && step<=3) showStage(4-step);
-  else { token++; show(step>=STEP_MAX ? "top3" : "idle"); }
+  else if(step>=STEP_MAX) showTop3();
+  else { token++; show("idle"); }
 }
 
 db.ref(DB_ROOT+"/amounts").on("value", s=>{
   amounts=s.val()||{};
   const first=!amountsReady;
   amountsReady=true;
-  if(first || (step>=1 && step<=3)) render();
+  if(first || step>=1) render();
 });
 db.ref(DB_ROOT+"/step").on("value", s=>{
   const v=parseInt(s.val(),10);
