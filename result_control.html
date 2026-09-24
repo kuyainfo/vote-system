@@ -59,17 +59,33 @@ h1{font-size:26px;letter-spacing:.1em;margin-bottom:8px;font-weight:900}
   border-radius:10px;border:1px solid var(--line);background:#050926;box-shadow:0 0 40px rgba(139,123,255,.35)}
 .frame iframe{position:absolute;left:0;top:0;width:1920px;height:1080px;border:0;
   transform-origin:0 0;pointer-events:none}
-.bar{width:min(92vw,640px,calc((100vh - 170px) * 16 / 9));height:4px;border-radius:2px;background:rgba(255,255,255,.12);margin-top:18px;overflow:hidden}
-.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--g1),var(--g3))}
-@keyframes fill{from{width:0}to{width:100%}}
-.mirror p{font-size:12px;color:var(--sub);margin-top:10px;letter-spacing:.1em}
+.mirror p{font-size:12px;color:var(--sub);margin-top:14px;letter-spacing:.1em}
+/* 工作人員小按鈕：字小、靠右下角，避免公布者誤觸 */
+.staff{position:fixed;right:16px;bottom:16px;padding:9px 14px;border-radius:16px;
+  border:1px solid var(--line);background:rgba(20,24,92,.55);color:rgba(225,232,255,.6);
+  font-family:inherit;font-size:11px;letter-spacing:.2em;cursor:pointer}
+.staff:active{background:rgba(20,24,92,.85)}
+
+/* 工作人員確認畫面 */
+.gate{position:fixed;inset:0;z-index:60;background:rgba(6,9,34,.97);
+  display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+.gate.on{display:flex}
+.gate .mk{font-size:12px;letter-spacing:.5em;color:var(--g3);margin-bottom:10px;font-weight:700}
+.gate h2{font-size:30px;letter-spacing:.06em;margin-bottom:34px;font-weight:900}
+.gate .go{padding:22px 40px;border:none;border-radius:20px;cursor:pointer;color:#fff;
+  background:linear-gradient(135deg,var(--g1),var(--g2) 50%,var(--g3));
+  font-family:inherit;font-size:22px;font-weight:900;letter-spacing:.08em;
+  box-shadow:0 0 40px rgba(139,123,255,.5)}
+.gate .go:active{transform:scale(.96)}
+.gate .back{margin-top:22px;padding:10px 18px;border:1px solid var(--line);border-radius:16px;
+  background:none;color:var(--sub);font-family:inherit;font-size:12px;letter-spacing:.2em;cursor:pointer}
 </style>
 </head>
 <body>
 
 <div class="kick">HOST CONTROLLER</div>
 <h1>公布結果</h1>
-<div class="desc">每按一次，投影推進一步<br>第三名 → 第二名 → 第一名 → 前三名總覽</div>
+<div class="desc">每按一次，投影推進一步<br>宣布完畢後交給工作人員解鎖下一步</div>
 <div class="steps" id="steps"><i></i><i></i><i></i><i></i></div>
 
 <button class="big" id="btn">
@@ -85,8 +101,16 @@ h1{font-size:26px;letter-spacing:.1em;margin-bottom:8px;font-weight:900}
   <div class="mk">LIVE SCREEN</div>
   <h2 id="mTitle">投影同步中</h2>
   <div class="frame" id="frame"><iframe id="scr" src="result_screen.html" title="投影畫面" tabindex="-1"></iframe></div>
-  <div class="bar"><i id="barFill"></i></div>
-  <p id="mBack">4 秒後自動返回按鈕畫面</p>
+  <p id="mBack">宣布完畢後，請將平板交給工作人員</p>
+  <button class="staff" id="staffBtn">工作人員</button>
+</div>
+
+<!-- 工作人員確認畫面：解鎖下一個名次 -->
+<div class="gate" id="gate">
+  <div class="mk">STAFF</div>
+  <h2 id="gateTxt">下一步：揭曉第二名</h2>
+  <button class="go" id="gateGo">準備好，交給公布者</button>
+  <button class="back" id="gateBack">返回投影畫面</button>
 </div>
 
 <script>
@@ -102,8 +126,6 @@ const FB_CONFIG = {
 };
 const DB_ROOT   = "result";
 const STEP_MAX  = 4;
-const MIRROR_FIRST_MS = 5000;   /* 第 1 下同步畫面停留時間（含投影按鈕動畫） */
-const MIRROR_MS       = 4000;   /* 其他步驟同步畫面停留時間 */
 const LABELS  = ["揭曉第三名","揭曉第二名","揭曉第一名","前三名總覽"];
 const SHOWING = ["等待畫面","第三名","第二名","第一名","前三名總覽"];
 /* ================================================== */
@@ -112,8 +134,8 @@ firebase.initializeApp(FB_CONFIG);
 const db=firebase.database();
 
 const $=id=>document.getElementById(id);
-const btn=$("btn"), box=$("stateBox"), txt=$("stateTxt"), mirror=$("mirror");
-let step=0, online=true, busy=false, backTimer=null;
+const btn=$("btn"), box=$("stateBox"), txt=$("stateTxt"), mirror=$("mirror"), gate=$("gate");
+let step=0, online=true, busy=false;
 
 function sync(){
   const done = step>=STEP_MAX;
@@ -133,22 +155,27 @@ function fitFrame(){
 window.addEventListener("resize", fitFrame);
 fitFrame();
 
-function openMirror(title, ms){
+/* 同步畫面：停在該名次，不自動返回，由工作人員操作後才解鎖下一步 */
+function openMirror(title){
   $("mTitle").textContent = title;
-  $("mBack").textContent = (ms/1000) + " 秒後自動返回按鈕畫面";
-  const bar=$("barFill");
-  bar.style.animation="none"; void bar.offsetWidth;
-  bar.style.animation="fill "+ms+"ms linear forwards";
   mirror.classList.add("on");
   fitFrame();
-  clearTimeout(backTimer);
-  backTimer=setTimeout(closeMirror, ms);
 }
 function closeMirror(){
   mirror.classList.remove("on");
   busy=false;
   sync();
 }
+
+$("staffBtn").onclick = ()=>{
+  const done = step>=STEP_MAX;
+  $("mBack").textContent = "宣布完畢後，請將平板交給工作人員";
+  $("gateTxt").textContent = done ? "已全部公布完畢" : ("下一步：" + LABELS[step]);
+  $("gateGo").textContent  = done ? "結束，返回首頁" : "準備好，交給公布者";
+  gate.classList.add("on");
+};
+$("gateBack").onclick = ()=>{ gate.classList.remove("on"); };
+$("gateGo").onclick   = ()=>{ gate.classList.remove("on"); closeMirror(); };
 
 db.ref(DB_ROOT+"/step").on("value", s=>{
   const v=parseInt(s.val(),10);
@@ -161,7 +188,7 @@ btn.onclick = async ()=>{
   if(btn.disabled) return;
   const next=Math.min(step+1, STEP_MAX);
   busy=true; sync();
-  openMirror("投影：" + SHOWING[next], next===1 ? MIRROR_FIRST_MS : MIRROR_MS);
+  openMirror("投影：" + SHOWING[next]);
   try{
     const r = await db.ref(DB_ROOT+"/step").transaction(v=>{
       v = parseInt(v,10) || 0;
@@ -169,7 +196,6 @@ btn.onclick = async ()=>{
     });
     if(r.committed) $("mTitle").textContent = "投影：" + SHOWING[r.snapshot.val()];
   }catch(e){
-    clearTimeout(backTimer);
     closeMirror();
     alert("推進失敗：" + e.message + "\n請重試");
   }
