@@ -181,9 +181,21 @@ $("gateGo").onclick   = async ()=>{
   closeMirror();
 };
 
-db.ref(DB_ROOT+"/step").on("value", s=>{
-  const v=parseInt(s.val(),10);
+/* 一律照 Firebase 狀態還原畫面，重整後也不會跳過宣布中的環節 */
+db.ref(DB_ROOT).on("value", s=>{
+  const d=s.val()||{};
+  const v=parseInt(d.step,10);
   step = isNaN(v) ? 0 : Math.max(0, Math.min(STEP_MAX, v));
+  const b=d.btn;
+  const announcing = (b===null||b===undefined) ? false : (!b && step>=1);
+  if(announcing){
+    busy=true;
+    openMirror("投影：" + SHOWING[step]);
+  }else{
+    gate.classList.remove("on");
+    mirror.classList.remove("on");
+    busy=false;
+  }
   sync();
 });
 db.ref(".info/connected").on("value", s=>{ online=!!s.val(); sync(); });
