@@ -171,7 +171,7 @@ document.getElementById("save").onclick = async ()=>{
 
 document.getElementById("reset").onclick = async ()=>{
   if(!confirm("重置揭曉狀態？投影畫面會回到等待結果。")) return;
-  try{ await db.ref(DB_ROOT).update({step:0, reveal:null, revealAt:null, potential:null, potentialAt:null}); }
+  try{ await db.ref(DB_ROOT).update({step:0, btn:true, reveal:null, revealAt:null, potential:null, potentialAt:null}); }
   catch(e){ alert("重置失敗："+e.message); }
 };
 

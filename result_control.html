@@ -175,7 +175,11 @@ $("staffBtn").onclick = ()=>{
   gate.classList.add("on");
 };
 $("gateBack").onclick = ()=>{ gate.classList.remove("on"); };
-$("gateGo").onclick   = ()=>{ gate.classList.remove("on"); closeMirror(); };
+$("gateGo").onclick   = async ()=>{
+  gate.classList.remove("on");
+  if(step<STEP_MAX){ try{ await db.ref(DB_ROOT+"/btn").set(true); }catch(e){} }
+  closeMirror();
+};
 
 db.ref(DB_ROOT+"/step").on("value", s=>{
   const v=parseInt(s.val(),10);
@@ -190,11 +194,8 @@ btn.onclick = async ()=>{
   busy=true; sync();
   openMirror("投影：" + SHOWING[next]);
   try{
-    const r = await db.ref(DB_ROOT+"/step").transaction(v=>{
-      v = parseInt(v,10) || 0;
-      return v>=STEP_MAX ? undefined : v+1;
-    });
-    if(r.committed) $("mTitle").textContent = "投影：" + SHOWING[r.snapshot.val()];
+    /* 進度與按鈕狀態一次寫入，投影才不會先收到新進度而閃到下一個名次 */
+    await db.ref(DB_ROOT).update({step: next, btn: false});
   }catch(e){
     closeMirror();
     alert("推進失敗：" + e.message + "\n請重試");

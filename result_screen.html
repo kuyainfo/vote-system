@@ -31,8 +31,8 @@ html,body{height:100%;overflow:hidden;background:#050926;color:#fff;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
   animation:breathe 2.6s ease-in-out infinite}
 .pbtn::before{content:"";position:absolute;inset:0;border-radius:50%;border:5px solid rgba(255,255,255,.7);opacity:0}
-.pb-lb{font-size:78px;font-weight:900;letter-spacing:.12em;padding-left:.12em;line-height:1;
-  text-shadow:0 4px 18px rgba(40,20,120,.45)}
+.pb-lb{font-size:62px;font-weight:900;letter-spacing:.08em;padding-left:.08em;line-height:1;
+  white-space:nowrap;text-shadow:0 4px 18px rgba(40,20,120,.45)}
 .pb-sm{font-size:22px;font-weight:700;letter-spacing:.5em;padding-left:.5em;opacity:.85}
 @keyframes breathe{
   0%,100%{box-shadow:0 0 0 14px rgba(255,255,255,.08),0 0 60px rgba(139,123,255,.5)}
@@ -114,7 +114,7 @@ html,body{height:100%;overflow:hidden;background:#050926;color:#fff;
 <div id="canvas">
 
   <div class="layer on" id="idle">
-    <div class="pbtn" id="idleBtn"><span class="pb-lb">公布結果</span><span class="pb-sm">FINAL RESULT</span></div>
+    <div class="pbtn" id="idleBtn"><span class="pb-lb" id="idleLb">公布第三名</span><span class="pb-sm" id="idleSm">3RD PLACE</span></div>
   </div>
 
   <div class="layer" id="stage">
@@ -164,7 +164,9 @@ const TEAMS = [
   {no:10, name:"星相科技股份有限公司",       logo:"assets/logos/xingxiang.png"}
 ];
 const SPIN_MS  = 2500;   /* Logo、公司名稱輪播與金額跳動的時間（毫秒） */
-const PRESS_MS = 1000;   /* 投影按鈕按下動畫時間（毫秒） */
+const PRESS_MS = 1000;
+/* 等待畫面按鈕文字：依下一個要公布的名次切換 */
+const IDLE_LB = [["公布第三名","3RD PLACE"],["公布第二名","2ND PLACE"],["公布第一名","1ST PLACE"],["公布前三名","TOP 3"]];   /* 投影按鈕按下動畫時間（毫秒） */
 const STEP_MAX = 4;      /* 0 等待／1 第三名／2 第二名／3 第一名／4 前三名總覽 */
 /* ================================================== */
 
@@ -174,7 +176,12 @@ const db=firebase.database();
 const $=id=>document.getElementById(id);
 const canvas=$("canvas"), stageEl=$("stage"), logoWrap=$("logoWrap"), logoEl=$("sLogo"),
       nameEl=$("sName"), amtEl=$("sAmt"), rankEl=$("sRank"), idleBtn=$("idleBtn");
-let amounts={}, amountsReady=false, step=0, token=0, lastStep=null, pressTimer=null;
+function setIdleLabel(n){
+  const p = IDLE_LB[Math.max(0, Math.min(IDLE_LB.length-1, n))];
+  $("idleLb").textContent = p[0];
+  $("idleSm").textContent = p[1];
+}
+let amounts={}, amountsReady=false, step=0, token=0, btnView=true, lastBtn=null, pressTimer=null;
 
 /* 預先載入 Logo，輪播時不閃爍 */
 TEAMS.forEach(t=>{ const i=new Image(); i.src=t.logo; });
@@ -300,31 +307,37 @@ function render(withPress){
   if(!amountsReady) return;
   clearTimeout(pressTimer);
   idleBtn.classList.remove("press");
+  if(btnView){ token++; setIdleLabel(step); show("idle"); return; }
   if(withPress){
     /* 手機按下第 1 下：投影按鈕先播按下動畫，再進第三名 */
     token++;
+    setIdleLabel(step-1);   /* 按下動畫維持剛按下的那個名次文字 */
     show("idle");
     void idleBtn.offsetWidth;
     idleBtn.classList.add("press");
-    pressTimer=setTimeout(()=>showStage(3), PRESS_MS);
+    pressTimer=setTimeout(showCurrent, PRESS_MS);
     return;
   }
-  if(step>=1 && step<=3) showStage(4-step);
-  else if(step>=STEP_MAX) showTop3();
+  showCurrent();
+}
+
+function showCurrent(){
+  if(step>=STEP_MAX) showTop3();
+  else if(step>=1) showStage(4-step);
   else { token++; show("idle"); }
 }
 
-db.ref(DB_ROOT+"/amounts").on("value", s=>{
-  amounts=s.val()||{};
-  const first=!amountsReady;
-  amountsReady=true;
-  if(first || step>=1) render();
-});
-db.ref(DB_ROOT+"/step").on("value", s=>{
-  const v=parseInt(s.val(),10);
+/* 一次讀整包（金額＋進度＋按鈕狀態），避免分批送達造成畫面閃爍 */
+db.ref(DB_ROOT).on("value", s=>{
+  const d=s.val()||{};
+  amounts = d.amounts||{};
+  amountsReady = true;
+  const v=parseInt(d.step,10);
   step = isNaN(v) ? 0 : Math.max(0, Math.min(STEP_MAX, v));
-  const prev=lastStep; lastStep=step;
-  render(prev===0 && step===1);   /* 中途重新整理不會重播按鈕動畫 */
+  const b=d.btn;
+  btnView = (b===null||b===undefined) ? (step===0) : !!b;
+  const prev=lastBtn; lastBtn=btnView;
+  render(prev===true && btnView===false);
 });
 db.ref(".info/connected").on("value", s=>{ $("warn").classList.toggle("on", !s.val()); });
 </script>
